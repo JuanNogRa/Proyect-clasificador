@@ -13,7 +13,15 @@
 
 En este documento se describe el proceso de desarrollo de la aplicación de clasificación automática de siniestros vehiculares con dictamen binario (`ENTREGADO` / `OBJETADO`). Se explica la arquitectura implementada basada en **RAG (Retrieval-Augmented Generation)** sobre **Azure OpenAI** y **Azure AI Search**, así como el pipeline de entrenamiento que comprende la extracción y agregación del dataset, la indexación vectorial del corpus histórico, la configuración del prompt de clasificación y la evaluación sobre conjuntos de validación y prueba independientes. También se presenta la API de inferencia desplegada en **Azure App Service** con CI/CD mediante GitHub Actions.
 
-En las métricas de validación (121 casos) se obtiene **recall OBJETADO: 0,974**, **precision OBJETADO: 0,649** e **IoU equivalente (F1 OBJETADO): 0,779**, con 2 falsos negativos. En el conjunto de prueba (120 casos) se obtiene **recall OBJETADO: 0,960**, **precision OBJETADO: 0,637** y **F1 OBJETADO: 0,766**, con 3 falsos negativos. El modelo prioriza la detección de objeciones (alto recall) a costa de mayor conservadurismo (más falsos positivos), alineado con el criterio de negocio.
+Los resultados sobre la clase **OBJETADO** (métrica principal de negocio) se resumen así:
+
+| Conjunto | Casos | Recall | Precision | F1 | FN |
+|----------|------:|-------:|----------:|---:|---:|
+| Validación | 121 | 0,974 | 0,649 | 0,779 | 2 |
+| Prueba | 120 | 0,960 | 0,637 | 0,766 | 3 |
+| **Val + Test** | **241** | **0,97** | **0,64** | **0,77** | **5** |
+
+El modelo prioriza la detección de objeciones (alto recall) a costa de mayor conservadurismo (más falsos positivos), alineado con el criterio de negocio.
 
 ---
 
