@@ -1,0 +1,21 @@
+# Entorno opcional del proyecto. Si usas conda 'base' (como pt.ipynb), activa base y pip install.
+# Crear:  conda env create -f environment.yml
+# Activar: conda activate subocol-rag
+name: subocol-rag
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python>=3.10
+  - pip
+  - pandas>=2.0
+  - numpy>=1.24
+  - matplotlib>=3.7
+  - seaborn>=0.13
+  - scikit-learn>=1.3
+  - pip:
+    - python-dotenv>=1.0
+    - openai>=1.40
+    - azure-identity>=1.17
+    - azure-search-documents>=11.6
+    - flask>=3.0

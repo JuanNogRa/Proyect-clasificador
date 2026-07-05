@@ -1,0 +1,2 @@
+# Dependencias para Azure App Service (Oryx lee este archivo en la raíz del repo).
+-r Inferencia/requirements.txt
