@@ -7,6 +7,10 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+from api.logging_config import configure_logging
+
+configure_logging()
+
 INFERENCIA_ROOT = Path(__file__).resolve().parent.parent
 ENTRENAMIENTO_ROOT = INFERENCIA_ROOT.parent / "Entrenamiento"
 
