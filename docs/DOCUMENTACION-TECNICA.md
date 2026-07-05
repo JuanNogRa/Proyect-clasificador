@@ -29,13 +29,13 @@ El modelo prioriza la detección de objeciones (alto recall) a costa de mayor co
 
 En las siguientes secciones se explica el pipeline para el desarrollo de un clasificador de dictámenes de siniestros vehiculares.
 
-El pipeline empieza en la extracción y consolidación del dataset de avisos (`dataset_pt.csv`), donde cada registro a nivel pieza se agrega en un aviso único con vehículo, versión de hechos, piezas afectadas y dictamen histórico. Este proceso se describe en la sección 2.1.
+El pipeline empieza en la extracción y consolidación del dataset de avisos (`dataset_pt.csv`), donde cada registro a nivel pieza se agrega en un aviso único con vehículo, versión de hechos, piezas afectadas y dictamen histórico. Este proceso se describe en la [sección 2.1](#21-dataset-de-avisos-de-siniestro).
 
-Se explica la arquitectura del modelo a través de un diagrama de bloques. Se define la tarea como **clasificación binaria asistida por recuperación**: dado un aviso nuevo, el sistema busca casos históricos similares en un índice vectorial y un LLM razona sobre el relato, las piezas y los precedentes para emitir dictamen, confianza y razones. El proceso y el diagrama se presentan en la sección 2.2.
+Se explica la arquitectura del modelo a través de un diagrama de bloques. Se define la tarea como **clasificación binaria asistida por recuperación**: dado un aviso nuevo, el sistema busca casos históricos similares en un índice vectorial y un LLM razona sobre el relato, las piezas y los precedentes para emitir dictamen, confianza y razones. El proceso y el diagrama se presentan en la [sección 2.2](#22-arquitectura-del-modelo-rag).
 
-En la sección 3 se presenta el funcionamiento de la API Flask para aplicar el modelo indexado sobre avisos en tiempo real, tanto en entorno local como en Azure App Service.
+En la [sección 3](#3-aplicación-de-inferencia-usando-el-modelo-entrenado) se presenta el funcionamiento de la API Flask para aplicar el modelo indexado sobre avisos en tiempo real, tanto en entorno local como en Azure App Service.
 
-Por último, en la sección 4 se discuten los resultados obtenidos del modelo evaluado, y en la sección 5 se detallan las instrucciones paso a paso para replicar el entorno y levantar el servicio.
+Por último, en la [sección 4](#4-análisis-de-resultados) se discuten los resultados obtenidos del modelo evaluado, y en la [sección 5](#5-instrucciones-para-replicar-el-entorno-y-levantar-el-servicio) se detallan las instrucciones paso a paso para replicar el entorno y levantar el servicio.
 
 ---
 
@@ -206,7 +206,7 @@ La API se despliega en **Azure App Service** (Linux, Python 3.11) con Gunicorn:
 gunicorn --bind=0.0.0.0:8000 --timeout 120 --access-logfile - --error-logfile - wsgi:app
 ```
 
-El CI/CD se ejecuta con GitHub Actions (`.github/workflows/main_rag-siniestros-api.yml`) en cada push a `main`. La autenticación hacia Azure OpenAI puede realizarse con **Managed Identity** (sin API key) o con clave en variables de entorno. Ver `docs/MANAGED-IDENTITY-AZURE.md` y `docs/DEPLOY-AZURE.md`.
+El CI/CD se ejecuta con GitHub Actions (`.github/workflows/main_rag-siniestros-api.yml`) en cada push a `main`. La autenticación hacia Azure OpenAI puede realizarse con **Managed Identity** (sin API key) o con clave en variables de entorno. Ver [MANAGED-IDENTITY-AZURE.md](MANAGED-IDENTITY-AZURE.md) y [DEPLOY-AZURE.md](DEPLOY-AZURE.md).
 
 ---
 
@@ -287,19 +287,13 @@ Las gráficas se generan en `Entrenamiento/pt.ipynb` (matriz de confusión, mét
 
 ### 4.5. Confianza del LLM
 
-Además de `dictamen`, el modelo devuelve un campo **`confianza`** (0,0–1,0) en el JSON de respuesta. La gráfica de la derecha en las figuras 1, 2 y 4 es un **boxplot** que muestra cómo se distribuye esa confianza según el tipo de resultado:
+Además de `dictamen`, el modelo devuelve un campo **`confianza`** (0,0–1,0) en el JSON de respuesta. La gráfica de la derecha en las [Figura 1](#41-validation-121-casos), [Figura 2](#42-test-120-casos) y [Figura 4](#44-val--test-combinado-241-casos) es un **boxplot** que muestra cómo se distribuye esa confianza según el tipo de resultado:
 
 | Categoría | Significado |
 |-----------|-------------|
 | **Correcto** | Predicción acertada (TP o TN) |
 | **FP (ENT→OBJ)** | Falso positivo: era ENTREGADO, predijo OBJETADO |
 | **FN (OBJ→ENT)** | Falso negativo: era OBJETADO, predijo ENTREGADO |
-
-**Cómo leer el boxplot:**
-
-- La **caja** abarca el 50 % central de los valores (percentiles 25–75).
-- La **línea dentro de la caja** es la **mediana** (valor típico).
-- Los **bigotes** muestran el rango restante; los **puntos sueltos** son casos atípicos (outliers).
 
 **Qué se observa:**
 
@@ -311,7 +305,7 @@ Además de `dictamen`, el modelo devuelve un campo **`confianza`** (0,0–1,0) e
 
 ### 4.6. Discusión
 
-Sobre el conjunto **Val + Test (241 avisos, 151 OBJETADO / 90 ENTREGADO)**, los resultados indican que el modelo **cumple el objetivo de negocio**:
+Sobre el conjunto **[Val + Test (241 avisos)](#44-val--test-combinado-241-casos)**, 151 OBJETADO / 90 ENTREGADO, los resultados indican que el modelo **cumple el objetivo de negocio**:
 
 | Indicador | Val + Test | Interpretación |
 |-----------|------------|----------------|
@@ -324,21 +318,19 @@ Sobre el conjunto **Val + Test (241 avisos, 151 OBJETADO / 90 ENTREGADO)**, los 
 
 El **trade-off** es claro: se sacrifica recall en ENTREGADO y se aceptan **81 FP** a cambio de mantener **FN en 5** sobre 241 casos. En términos de negocio, es preferible enviar casos sanos a revisión manual que dejar pasar objeciones reales.
 
-La **estabilidad entre val y test** refuerza la conclusión: recall OBJ 0,974 vs 0,960, FN 2 vs 3 y FP 40 vs 41. No hay divergencia fuerte entre splits; el comportamiento agregado es coherente con lo observado por separado.
+La **[estabilidad entre val y test](#43-comparación-val-vs-test)** refuerza la conclusión: recall OBJ 0,974 vs 0,960, FN 2 vs 3 y FP 40 vs 41. No hay divergencia fuerte entre splits; el comportamiento agregado es coherente con lo observado por separado.
 
-La **confianza del LLM** (§4.5) muestra sobreconfianza: el modelo reporta valores altos (~0,93–0,95) tanto en aciertos como en errores, por lo que `confianza` no sustituye la revisión humana en casos dudosos.
+La **[confianza del LLM](#45-confianza-del-llm)** muestra sobreconfianza: el modelo reporta valores altos (~0,93–0,95) tanto en aciertos como en errores, por lo que `confianza` no sustituye la revisión humana en casos dudosos.
 
 **Trabajo futuro propuesto:**
 
-| Área | Acciones |
-|------|----------|
-| **Reducir FP** | Ajuste fino de prompt, `top_k` y umbrales; revisar casos FP para patrones repetidos |
-| **Confianza** | Calibrar o validar el campo `confianza`; no usarlo como único filtro automático |
-| **Modelos LLM** | Evaluar alternativas (`gpt-4o-mini`, modelos más pequeños o regionales) comparando recall OBJ y costo por aviso en val |
-| **Embeddings** | Probar otros deployments (`text-embedding-3-large`, `ada-002`) midiendo calidad de retrieval vs costo de indexación e inferencia |
-| **Costos Azure** | Benchmark de latencia y tokens por predict; optimizar `top_k` y longitud de contexto enviado al LLM |
-| **Operación** | Managed Identity en Search; Application Insights; pipeline de re-indexación al actualizar el dataset |
-| **Monitoreo** | Evaluación continua en producción (drift, recall OBJ, tasa de FP) con muestra auditada |
+- **Reducir FP:** ajuste fino de prompt, `top_k` y umbrales; revisar casos FP para identificar patrones repetidos.
+- **Confianza:** calibrar o validar el campo `confianza` ([sección 4.5](#45-confianza-del-llm)); no usarlo como único filtro automático.
+- **Modelos LLM:** evaluar alternativas (`gpt-4o-mini`, modelos más pequeños o regionales) comparando recall OBJ y costo por aviso en val.
+- **Embeddings:** probar otros deployments (`text-embedding-3-large`, `ada-002`) midiendo calidad de retrieval vs costo de indexación e inferencia.
+- **Costos Azure:** benchmark de latencia y tokens por predict; optimizar `top_k` y longitud de contexto enviado al LLM.
+- **Operación:** Managed Identity en Search; Application Insights; pipeline de re-indexación al actualizar el dataset.
+- **Monitoreo:** evaluación continua en producción (drift, recall OBJ, tasa de FP) con muestra auditada.
 
 ---
 
@@ -412,10 +404,10 @@ curl -X POST http://localhost:8000/v1/predict -H "Content-Type: application/json
 
 ### 5.7. Desplegar en Azure
 
-1. Crear App Service Linux Python 3.11 (ver `docs/DEPLOY-AZURE.md`).
+1. Crear App Service Linux Python 3.11 (ver [DEPLOY-AZURE.md](DEPLOY-AZURE.md)).
 2. Configurar variables de entorno (endpoint con `https://`, deployments, Search).
 3. Startup command: Gunicorn sobre `wsgi:app`.
-4. Activar Managed Identity si aplica (ver `docs/MANAGED-IDENTITY-AZURE.md`).
+4. Activar Managed Identity si aplica (ver [MANAGED-IDENTITY-AZURE.md](MANAGED-IDENTITY-AZURE.md)).
 5. Conectar GitHub Actions → `git push origin main`.
 6. Verificar: `curl https://rag-siniestros-api-TU-SUFFIX.azurewebsites.net/health`.
 
