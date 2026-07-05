@@ -23,6 +23,8 @@ def _require(name: str) -> str:
 def normalize_openai_endpoint(endpoint: str) -> str:
     """Normaliza URLs de Azure AI Foundry al endpoint OpenAI v1 del portal."""
     endpoint = endpoint.strip().rstrip("/")
+    if endpoint and "://" not in endpoint:
+        endpoint = f"https://{endpoint}"
 
     if "/openai/v1" in endpoint:
         return endpoint.split("/openai/v1", 1)[0] + "/openai/v1"

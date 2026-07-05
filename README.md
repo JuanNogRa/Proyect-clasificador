@@ -7,6 +7,7 @@
 
 - Entrenamiento: [Entrenamiento/README.md](Entrenamiento/README.md)
 - Inferencia: [Inferencia/README.md](Inferencia/README.md)
+- **Documentación técnica:** [docs/DOCUMENTACION-TECNICA.md](docs/DOCUMENTACION-TECNICA.md)
 - **Deploy Azure (GitHub Actions):** [docs/DEPLOY-AZURE.md](docs/DEPLOY-AZURE.md)
 
 ## Entorno conda
