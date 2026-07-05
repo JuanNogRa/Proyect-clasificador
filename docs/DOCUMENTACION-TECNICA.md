@@ -214,6 +214,8 @@ El CI/CD se ejecuta con GitHub Actions (`.github/workflows/main_rag-siniestros-a
 
 Con la evaluación del modelo sobre los conjuntos val y test se obtienen las siguientes métricas. La métrica principal de negocio es el **recall de OBJETADO**, dado que un falso negativo implica clasificar como ENTREGADO un caso que debía ser OBJETADO.
 
+Las gráficas se generan en `Entrenamiento/pt.ipynb` (matriz de confusión, métricas por clase, confianza del LLM y comparación val vs test).
+
 ### 4.1. Validation (121 casos)
 
 | Métrica | ENTREGADO | OBJETADO |
@@ -228,6 +230,10 @@ Con la evaluación del modelo sobre los conjuntos val y test se obtienen las sig
 |--|----------------|---------------|
 | Real ENTREGADO | 5 | 40 |
 | Real OBJETADO | **2** | 74 |
+
+![Validation — matriz de confusión, métricas por clase y confianza del LLM](img/val-metricas.png)
+
+*Figura 1. Evaluación en validación (121 avisos).*
 
 ### 4.2. Test (120 casos)
 
@@ -244,20 +250,95 @@ Con la evaluación del modelo sobre los conjuntos val y test se obtienen las sig
 | Real ENTREGADO | 4 | 41 |
 | Real OBJETADO | **3** | 72 |
 
+![Test — matriz de confusión, métricas por clase y confianza del LLM](img/test-metricas.png)
+
+*Figura 2. Evaluación en prueba (120 avisos).*
+
 ### 4.3. Comparación val vs test
 
-| Split | Recall OBJ | Precision OBJ | F1 OBJ | FN | FP |
-|-------|------------|---------------|--------|----|----|
-| Val | 0,974 | 0,649 | 0,779 | 2 | 40 |
-| Test | 0,960 | 0,637 | 0,766 | 3 | 41 |
+| Split | Casos | Recall OBJ | Precision OBJ | F1 OBJ | FN | FP |
+|-------|------:|-----------:|--------------:|-------:|---:|---:|
+| Val | 121 | 0,974 | 0,649 | 0,779 | 2 | 40 |
+| Test | 120 | 0,960 | 0,637 | 0,766 | 3 | 41 |
+| **Val + Test** | **241** | **0,97** | **0,64** | **0,77** | **5** | **81** |
 
-### 4.4. Discusión
+![Comparación val vs test — recall, precision, F1 y errores FN/FP](img/val-vs-test-comparacion.png)
 
-Los resultados indican que el modelo cumple el objetivo de negocio: detecta entre el **96 % y el 97 %** de los casos OBJETADO, con solo **2–3 falsos negativos** en val y test respectivamente. El trade-off es un número elevado de falsos positivos (40–41 casos ENTREGADO clasificados como OBJETADO), lo que implica más revisión manual pero reduce el riesgo de pagos indebidos.
+*Figura 3. Contraste de métricas OBJETADO y errores entre splits.*
 
-La estabilidad entre val y test sugiere que el modelo no presenta sobreajuste severo. El recall bajo en ENTREGADO (~9–11 %) es consecuencia directa de la estrategia conservadora priorizando OBJETADO.
+### 4.4. Val + Test combinado (241 casos)
 
-**Trabajo futuro propuesto:** reducir falsos positivos ajustando prompt y umbral de confianza; habilitar Managed Identity también en Azure AI Search; incorporar Application Insights para monitoreo en producción; pipeline de re-indexación automática al actualizar el dataset.
+| Métrica | ENTREGADO | OBJETADO |
+|---------|-----------|----------|
+| Precision | 0,64 | 0,64 |
+| Recall | 0,10 | **0,97** |
+| F1 | 0,18 | **0,77** |
+
+**Matriz de confusión:**
+
+|  | Pred ENTREGADO | Pred OBJETADO |
+|--|----------------|---------------|
+| Real ENTREGADO | 9 | 81 |
+| Real OBJETADO | **5** | 146 |
+
+![Val + Test — matriz de confusión, métricas por clase y confianza del LLM](img/val-test-metricas.png)
+
+*Figura 4. Evaluación agregada val + test (241 avisos).*
+
+### 4.5. Confianza del LLM
+
+Además de `dictamen`, el modelo devuelve un campo **`confianza`** (0,0–1,0) en el JSON de respuesta. La gráfica de la derecha en las figuras 1, 2 y 4 es un **boxplot** que muestra cómo se distribuye esa confianza según el tipo de resultado:
+
+| Categoría | Significado |
+|-----------|-------------|
+| **Correcto** | Predicción acertada (TP o TN) |
+| **FP (ENT→OBJ)** | Falso positivo: era ENTREGADO, predijo OBJETADO |
+| **FN (OBJ→ENT)** | Falso negativo: era OBJETADO, predijo ENTREGADO |
+
+**Cómo leer el boxplot:**
+
+- La **caja** abarca el 50 % central de los valores (percentiles 25–75).
+- La **línea dentro de la caja** es la **mediana** (valor típico).
+- Los **bigotes** muestran el rango restante; los **puntos sueltos** son casos atípicos (outliers).
+
+**Qué se observa:**
+
+- La mediana de confianza en aciertos ronda **0,94–0,95**.
+- En errores (FP y FN) la mediana también es alta (**~0,93–0,95**): el modelo suele estar **seguro incluso cuando se equivoca** (sobreconfianza).
+- Algunos aciertos tienen confianza más baja (~0,75–0,85), pero son pocos (outliers).
+
+**Implicación de negocio:** no basta con filtrar por `confianza >= 0,9` para detectar errores, porque muchos FP y FN también reportan confianza alta. La confianza complementa la auditoría, pero el criterio principal sigue siendo el dictamen y las `razones` / `casos_similares`.
+
+### 4.6. Discusión
+
+Sobre el conjunto **Val + Test (241 avisos, 151 OBJETADO / 90 ENTREGADO)**, los resultados indican que el modelo **cumple el objetivo de negocio**:
+
+| Indicador | Val + Test | Interpretación |
+|-----------|------------|----------------|
+| Recall OBJETADO | **0,97** (146/151) | Detecta casi todas las objeciones reales |
+| Falsos negativos (FN) | **5** | Solo 5 OBJETADO pasaron como ENTREGADO — riesgo bajo de pago indebido |
+| Precision OBJETADO | **0,64** | De cada 100 predicciones OBJETADO, ~64 son correctas |
+| Falsos positivos (FP) | **81** | 81 ENTREGADO marcados como OBJETADO — más cola de revisión manual |
+| Recall ENTREGADO | **0,10** (9/90) | Consecuencia de la estrategia conservadora |
+| F1 OBJETADO | **0,77** | Balance razonable priorizando detección de objeciones |
+
+El **trade-off** es claro: se sacrifica recall en ENTREGADO y se aceptan **81 FP** a cambio de mantener **FN en 5** sobre 241 casos. En términos de negocio, es preferible enviar casos sanos a revisión manual que dejar pasar objeciones reales.
+
+La **estabilidad entre val y test** refuerza la conclusión: recall OBJ 0,974 vs 0,960, FN 2 vs 3 y FP 40 vs 41. No hay divergencia fuerte entre splits; el comportamiento agregado es coherente con lo observado por separado.
+
+La **confianza del LLM** (§4.5) muestra sobreconfianza: el modelo reporta valores altos (~0,93–0,95) tanto en aciertos como en errores, por lo que `confianza` no sustituye la revisión humana en casos dudosos.
+
+**Trabajo futuro propuesto:**
+
+| Área | Acciones |
+|------|----------|
+| **Reducir FP** | Ajuste fino de prompt, `top_k` y umbrales; revisar casos FP para patrones repetidos |
+| **Confianza** | Calibrar o validar el campo `confianza`; no usarlo como único filtro automático |
+| **Modelos LLM** | Evaluar alternativas (`gpt-4o-mini`, modelos más pequeños o regionales) comparando recall OBJ y costo por aviso en val |
+| **Embeddings** | Probar otros deployments (`text-embedding-3-large`, `ada-002`) midiendo calidad de retrieval vs costo de indexación e inferencia |
+| **Costos Azure** | Benchmark de latencia y tokens por predict; optimizar `top_k` y longitud de contexto enviado al LLM |
+| **Operación** | Managed Identity en Search; Application Insights; pipeline de re-indexación al actualizar el dataset |
+| **Monitoreo** | Evaluación continua en producción (drift, recall OBJ, tasa de FP) con muestra auditada |
 
 ---
 
