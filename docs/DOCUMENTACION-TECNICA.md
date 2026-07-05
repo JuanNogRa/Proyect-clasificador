@@ -60,6 +60,8 @@ El particionamiento es **estratificado** por `estado_aviso` (`random_state=42`):
 | Val | 121 (15 %) | Ajuste de prompt y top-K |
 | Test | 120 (15 %) | Evaluación final (no indexado) |
 
+El dataset se separó en train, val y test con la proporción habitual **70 % / 15 % / 15 %**, estratificada por clase. Es la partición típica en aprendizaje automático: train para entrenar o ajustar el modelo, val para comparar configuraciones y test para la evaluación final sin filtración. En una primera exploración se siguió ese esquema pensando en un modelo ML clásico; al adoptar RAG se conservó la misma división: **solo train** alimenta el índice vectorial, mientras **val y test** quedan fuera del corpus indexado para medir el desempeño de forma honesta.
+
 Para cada aviso se construye un texto estructurado con vehículo, versión de hechos, piezas afectadas y conteos. En el corpus indexado (train) se incluye además el dictamen histórico; en inferencia ese campo se omite para evitar filtración de información.
 
 **Preprocesamiento principal** (`agregar_por_aviso` en `data_pipeline.py`):
@@ -322,15 +324,13 @@ La **[estabilidad entre val y test](#43-comparación-val-vs-test)** refuerza la 
 
 La **[confianza del LLM](#45-confianza-del-llm)** muestra sobreconfianza: el modelo reporta valores altos (~0,93–0,95) tanto en aciertos como en errores, por lo que `confianza` no sustituye la revisión humana en casos dudosos.
 
-**Trabajo futuro propuesto:**
+**Trabajo futuro propuesto**
 
-- **Análisis de errores (FN y FP):** revisar los **5 FN** del conjunto val+test (OBJETADO real → predijo ENTREGADO): inspeccionar relato, piezas, `razones` y `casos_similares` para entender por qué no aplicó objeción (p. ej. similares históricos mayormente ENTREGADO, señal de tercero no detectada, relato aparentemente coherente). Revisar los **81 FP** (ENTREGADO real → predijo OBJETADO), priorizando patrones repetidos; causas habituales en este modelo: prompt conservador (“duda → OBJETADO”), al menos un similar OBJETADO en top-K, reglas de tercero o inconsistencia relato–piezas activadas en exceso, o confianza &lt; 0,9 con señal de objeción. Los casos están en `data/val_predictions.csv` y `data/test_predictions.csv` (filtrar por `dictamen_real` ≠ `dictamen_pred`).
-- **Confianza:** las reglas de negocio (tercero, inconsistencia, duda → OBJETADO, priorizar recall OBJETADO) **ya están en el system prompt** — no son pendiente de implementación. Lo que sí queda por mejorar es el campo `confianza`: hoy no separa bien aciertos de errores ([sección 4.5](#45-confianza-del-llm)). A futuro, opcional: **calibrador** (segundo modelo que corrige el score con ejemplos ya revisados) o **logprobs** (probabilidad interna del LLM, si Azure lo expone en el deployment).
-- **Modelos LLM:** evaluar alternativas (`gpt-4o-mini`, modelos más pequeños o regionales) comparando recall OBJ y costo por aviso en val.
-- **Embeddings:** probar otros deployments (`text-embedding-3-large`, `ada-002`) midiendo calidad de retrieval vs costo de indexación e inferencia.
-- **Costos Azure:** benchmark de latencia y tokens por predict; optimizar `top_k` y longitud de contexto enviado al LLM.
-- **Operación y actualización del corpus:** Managed Identity en Search; Application Insights; pipeline periódico que, al incorporar avisos nuevos al dataset, vuelva a ejecutar `train_rag.py`, actualice el índice en Azure AI Search y re-evalúe métricas en val antes de desplegar (re-indexación, no fine-tuning del LLM).
-- **Monitoreo:** evaluación continua en producción (drift, recall OBJ, tasa de FP) con muestra auditada; disparar re-indexación o ajuste de prompt cuando las métricas se degraden.
+Aunque el recall de OBJETADO cumple el objetivo de negocio, los 5 falsos negativos y los 81 falsos positivos del conjunto val+test muestran margen de mejora. Se propone analizar de forma puntual los 5 FN — avisos objetados que el modelo clasificó como entregados — revisando en cada uno la versión de hechos, las piezas, las razones generadas y los casos similares recuperados, a fin de entender por qué no se aplicó la objeción y, si corresponde, ajustar el prompt o la recuperación en Azure AI Search. Del mismo modo, se recomienda revisar los 81 FP para identificar patrones repetidos: en este modelo suelen deberse a la estrategia conservadora del prompt, a la activación de reglas como tercero o inconsistencia relato–piezas, o a que al menos 1 caso similar objetado aparece entre los recuperados. Esos casos están registrados en `data/val_predictions.csv` y `data/test_predictions.csv`.
+
+Las reglas de negocio: terceras personas involucradas, inconsistencia, duda razonable y prioridad de recall en OBJETADO ya están definidas en el system prompt. No obstante, el campo de confianza que devuelve el LLM no distingue con claridad entre aciertos y errores, tal como se muestra en la [sección 4.5](#45-confianza-del-llm). Se propone, en una fase posterior, complementar ese indicador con otras señales: las probabilidades internas del propio modelo (logprobs), las puntuaciones de recuperación y la proporción de dictámenes entre los casos similares, obtenibles sin modificar el LLM; y evaluaciones por lote sobre val y test, útiles para auditar el servicio fuera de la inferencia en tiempo real.
+
+Por último, se propone evaluar otros despliegues de lenguaje y de embeddings que reduzcan costo en Azure sin degradar el recall; automatizar la re-indexación del corpus train cuando se incorporen avisos nuevos (`train_rag.py`); completar la operación en producción con Managed Identity en Search y Application Insights; y monitorear de forma continua recall, tasa de FP y deriva del servicio para decidir cuándo re-indexar o retocar el prompt.
 
 ---
 
