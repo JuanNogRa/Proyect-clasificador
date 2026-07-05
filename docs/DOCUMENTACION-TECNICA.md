@@ -325,12 +325,12 @@ La **[confianza del LLM](#45-confianza-del-llm)** muestra sobreconfianza: el mod
 **Trabajo futuro propuesto:**
 
 - **Reducir FP:** ajuste fino de prompt, `top_k` y umbrales; revisar casos FP para identificar patrones repetidos.
-- **Confianza:** calibrar o validar el campo `confianza` ([sección 4.5](#45-confianza-del-llm)); no usarlo como único filtro automático.
+- **Confianza:** no usar `confianza` como único filtro ([sección 4.5](#45-confianza-del-llm)). Alternativas a explorar: validar el score contra una muestra auditada manualmente; combinar confianza con reglas (p. ej. FP frecuentes → revisión); pedir al LLM una escala más explícita o un campo `requiere_revision`; usar señales del retrieval (similitud de casos, mezcla ENT/OBJ en top-K); o entrenar un calibrador ligero sobre predicciones etiquetadas. Si el deployment lo permite, contrastar con logprobs del modelo.
 - **Modelos LLM:** evaluar alternativas (`gpt-4o-mini`, modelos más pequeños o regionales) comparando recall OBJ y costo por aviso en val.
 - **Embeddings:** probar otros deployments (`text-embedding-3-large`, `ada-002`) midiendo calidad de retrieval vs costo de indexación e inferencia.
 - **Costos Azure:** benchmark de latencia y tokens por predict; optimizar `top_k` y longitud de contexto enviado al LLM.
-- **Operación:** Managed Identity en Search; Application Insights; pipeline de re-indexación al actualizar el dataset.
-- **Monitoreo:** evaluación continua en producción (drift, recall OBJ, tasa de FP) con muestra auditada.
+- **Operación y actualización del corpus:** Managed Identity en Search; Application Insights; pipeline periódico que, al incorporar avisos nuevos al dataset, vuelva a ejecutar `train_rag.py`, actualice el índice en Azure AI Search y re-evalúe métricas en val antes de desplegar (re-indexación, no fine-tuning del LLM).
+- **Monitoreo:** evaluación continua en producción (drift, recall OBJ, tasa de FP) con muestra auditada; disparar re-indexación o ajuste de prompt cuando las métricas se degraden.
 
 ---
 
