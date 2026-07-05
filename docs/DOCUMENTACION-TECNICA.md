@@ -71,21 +71,53 @@ Para cada aviso se construye un texto estructurado con vehículo, versión de he
 
 ### 2.2. Arquitectura del modelo RAG
 
-La arquitectura sigue el patrón **encoder–retriever–generator**:
+La arquitectura sigue el patrón **RAG sobre Azure**: un orquestador (API Flask) coordina la recuperación de casos similares en **Azure AI Search** y la generación del dictamen en **Azure OpenAI**, alimentado por el corpus histórico indexado en el entrenamiento.
 
+![Arquitectura RAG Azure — patrón de referencia](img/arquitectura-rag-azure-referencia.png)
+
+*Patrón RAG en Azure: App UX → Orquestador ↔ AI Search (Query → Knowledge) ↔ OpenAI (Prompt + Knowledge → Response).*
+
+**Adaptación a este proyecto:**
+
+```mermaid
+flowchart LR
+    subgraph Cliente
+        UX["App UX<br/>Postman / HTTP"]
+    end
+
+    subgraph AppService["Azure App Service"]
+        ORCH["Flask API<br/>Orquestador RAG<br/>Inferencia/api"]
+    end
+
+    subgraph AzureSearch["Azure AI Search"]
+        SEARCH["Índice siniestros-rag<br/>búsqueda híbrida<br/>top-K casos similares"]
+    end
+
+    subgraph AzureOpenAI["Azure OpenAI"]
+        EMB["text-embedding-3-small"]
+        LLM["gpt-5-mini"]
+    end
+
+    subgraph Fuentes["Fuentes de datos"]
+        DS["dataset_pt.csv<br/>train · 559 avisos"]
+    end
+
+    UX -->|"POST /v1/predict"| ORCH
+    ORCH -->|"1. Embedding del aviso"| EMB
+    EMB --> ORCH
+    ORCH <-->|"2. Query → Knowledge"| SEARCH
+    DS -->|"Indexación<br/>train_rag.py"| SEARCH
+    ORCH -->|"3. Prompt + casos similares"| LLM
+    LLM -->|"4. dictamen · confianza · razones"| ORCH
+    ORCH -->|"JSON respuesta"| UX
 ```
-┌─────────────────┐     ┌──────────────────────┐     ┌─────────────────────┐
-│  Aviso nuevo    │────▶│  Azure OpenAI        │────▶│  Azure AI Search    │
-│  (JSON/texto)   │     │  text-embedding-3    │     │  búsqueda híbrida   │
-└─────────────────┘     └──────────────────────┘     │  top-K casos similares│
-                                                      └──────────┬──────────┘
-                                                                 │
-┌─────────────────┐     ┌──────────────────────┐                │
-│  Respuesta JSON │◀────│  Azure OpenAI        │◀───────────────┘
-│  dictamen +     │     │  gpt-5-mini          │   prompt + casos
-│  razones        │     │  (JSON estructurado) │
-└─────────────────┘     └──────────────────────┘
-```
+
+| Flujo | Descripción |
+|-------|-------------|
+| **1. Embedding** | El aviso se vectoriza con `text-embedding-3-small`. |
+| **2. Retrieval** | Azure AI Search devuelve los `top-K` casos históricos más similares (híbrido texto + vector). |
+| **3. Generación** | `gpt-5-mini` recibe el system prompt, los casos recuperados y el aviso nuevo. |
+| **4. Respuesta** | La API devuelve JSON con `dictamen`, `confianza`, `razones` y `casos_similares`. |
 
 **Componentes:**
 
