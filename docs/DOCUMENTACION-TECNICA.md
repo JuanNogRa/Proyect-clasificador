@@ -441,9 +441,7 @@ curl -X POST http://localhost:8000/v1/predict -H "Content-Type: application/json
 
 [4] Microsoft, "Diagrama de arquitectura de patrones RAG con búsqueda de Azure AI," *Administración de requisitos*, [Online]. Available: https://learn.microsoft.com/es-es/industry/mobility/architecture/manage-requirements
 
-[5] Microsoft, "RAG pattern overview," [Online]. Available: https://learn.microsoft.com/azure/architecture/ai-ml/guide/rag/rag-overview
-
-[6] D. Gupta, "Image segmentation keras: Implementation of segnet, fcn, unet, pspnet and other models in keras," 2023. *(Referencia de arquitectura del documento guía original.)*
+[5] Microsoft, "Diseño y desarrollo de una solución RAG en Azure," *Azure Architecture Center*, [Online]. Available: https://learn.microsoft.com/es-es/azure/architecture/ai-ml/guide/rag/rag-solution-design-and-evaluation-guide
 
 ---
 
