@@ -73,9 +73,9 @@ Para cada aviso se construye un texto estructurado con vehículo, versión de he
 
 La arquitectura sigue el patrón **RAG sobre Azure**: un orquestador (API Flask) coordina la recuperación de casos similares en **Azure AI Search** y la generación del dictamen en **Azure OpenAI**, alimentado por el corpus histórico indexado en el entrenamiento.
 
-![Arquitectura RAG Azure — patrón de referencia](img/arquitectura-rag-azure-referencia.png)
+![Diagrama de arquitectura de patrones RAG con búsqueda de Azure AI](img/arquitectura-rag-azure-referencia.png)
 
-*Patrón RAG en Azure: App UX → Orquestador ↔ AI Search (Query → Knowledge) ↔ OpenAI (Prompt + Knowledge → Response).*
+*Figura adaptada del patrón RAG en Azure (App UX → Orquestador ↔ AI Search ↔ OpenAI). Fuente: [Administración de requisitos — Microsoft Learn](https://learn.microsoft.com/es-es/industry/mobility/architecture/manage-requirements).*
 
 **Adaptación a este proyecto:**
 
@@ -148,7 +148,7 @@ flowchart LR
 | Response format | `json_object` |
 | Estrategia ante duda | OBJETADO (conservador) |
 
-Se exploró un baseline ML clásico en `pt - ml.ipynb`, pero se descartó por menor capacidad de capturar reglas de negocio complejas y de ofrecer explicabilidad mediante casos similares y razones textuales.
+Se optó por **RAG desde el diseño** (antes que un enfoque ML clásico) porque funciona mejor para capturar reglas de negocio complejas, razonar sobre coherencia semántica entre relato y piezas, y ofrecer explicabilidad mediante casos similares y razones textuales.
 
 ---
 
@@ -358,9 +358,11 @@ curl -X POST http://localhost:8000/v1/predict -H "Content-Type: application/json
 
 [3] Microsoft, "Vector search in Azure AI Search," [Online]. Available: https://learn.microsoft.com/azure/search/vector-search-overview
 
-[4] Microsoft, "RAG pattern overview," [Online]. Available: https://learn.microsoft.com/azure/architecture/ai-ml/guide/rag/rag-overview
+[4] Microsoft, "Diagrama de arquitectura de patrones RAG con búsqueda de Azure AI," *Administración de requisitos*, [Online]. Available: https://learn.microsoft.com/es-es/industry/mobility/architecture/manage-requirements
 
-[5] D. Gupta, "Image segmentation keras: Implementation of segnet, fcn, unet, pspnet and other models in keras," 2023. *(Referencia de arquitectura del documento guía original.)*
+[5] Microsoft, "RAG pattern overview," [Online]. Available: https://learn.microsoft.com/azure/architecture/ai-ml/guide/rag/rag-overview
+
+[6] D. Gupta, "Image segmentation keras: Implementation of segnet, fcn, unet, pspnet and other models in keras," 2023. *(Referencia de arquitectura del documento guía original.)*
 
 ---
 
