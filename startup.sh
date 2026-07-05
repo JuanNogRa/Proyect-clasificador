@@ -1,8 +1,7 @@
 #!/bin/bash
+# No hacer cd: Oryx ya posiciona el cwd en el directorio de la app (/tmp/... o wwwroot).
 set -e
-cd /home/site/wwwroot
 
-# Oryx instala dependencias en antenv durante el deploy
 if [ -f antenv/bin/activate ]; then
   source antenv/bin/activate
 fi
