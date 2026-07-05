@@ -1,36 +1,13 @@
-name: Deploy API Inferencia
+# Desactivado: usar main_rag-siniestros-api.yml (OIDC desde Azure Portal)
+# o volver a activar si usas Publish Profile en lugar de OIDC.
+name: Deploy API Inferencia (publish profile)
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "Inferencia/**"
-      - "Entrenamiento/src/**"
-      - "requirements.txt"
-      - "wsgi.py"
-      - "startup.sh"
-      - "runtime.txt"
-      - ".gitattributes"
-      - ".github/workflows/deploy-inferencia.yml"
   workflow_dispatch:
 
 jobs:
   deploy:
+    if: false
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Verify deploy entrypoint
-        run: |
-          test -f wsgi.py
-          test -f startup.sh
-          test -d Entrenamiento/src
-          test -f Inferencia/api/app.py
-
-      - name: Deploy to Azure Web App
-        uses: azure/webapps-deploy@v3
-        with:
-          app-name: ${{ secrets.AZURE_WEBAPP_NAME }}
-          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-          package: .
+      - run: echo "Workflow desactivado"

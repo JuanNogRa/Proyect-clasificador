@@ -9,3 +9,6 @@ if str(INFERENCIA) not in sys.path:
     sys.path.insert(0, str(INFERENCIA))
 
 from app import app  # noqa: E402  → Inferencia/app.py
+
+# Azure Oryx a veces busca la variable "application"
+application = app
