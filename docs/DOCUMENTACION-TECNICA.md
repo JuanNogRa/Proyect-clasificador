@@ -1,6 +1,6 @@
 # Prueba Técnica — Clasificador RAG de Siniestros Vehiculares
 
-**Subocol IA — Analytics Jr**  
+**Prueba técnica – Especialista en IA (Python)**  
 **Juan Noguera**  
 **Julio de 2026**
 
@@ -31,7 +31,9 @@ En las siguientes secciones se explica el pipeline para el desarrollo de un clas
 
 El pipeline empieza en la extracción y consolidación del dataset de avisos (`dataset_pt.csv`), donde cada registro a nivel pieza se agrega en un aviso único con vehículo, versión de hechos, piezas afectadas y dictamen histórico. Este proceso se describe en la [sección 2.1](#21-dataset-de-avisos-de-siniestro).
 
-Se explica la arquitectura del modelo a través de un diagrama de bloques. Se define la tarea como **clasificación binaria asistida por recuperación**: dado un aviso nuevo, el sistema busca casos históricos similares en un índice vectorial y un LLM razona sobre el relato, las piezas y los precedentes para emitir dictamen, confianza y razones. El proceso y el diagrama se presentan en la [sección 2.2](#22-arquitectura-del-modelo-rag).
+En la [sección 2.2](#22-indexación-campos-del-documento-y-vector-de-embeddings) se detalla qué campos se indexan en Azure AI Search y qué texto alimenta el vector de embeddings.
+
+Se explica la arquitectura del modelo a través de un diagrama de bloques. Se define la tarea como **clasificación binaria asistida por recuperación**: dado un aviso nuevo, el sistema busca casos históricos similares en un índice vectorial y un LLM razona sobre el relato, las piezas y los precedentes para emitir dictamen, confianza y razones. El proceso y el diagrama se presentan en la [sección 2.3](#23-arquitectura-del-modelo-rag).
 
 En la [sección 3](#3-aplicación-de-inferencia-usando-el-modelo-entrenado) se presenta el funcionamiento de la API Flask para aplicar el modelo indexado sobre avisos en tiempo real, tanto en entorno local como en Azure App Service.
 
@@ -71,7 +73,60 @@ Para cada aviso se construye un texto estructurado con vehículo, versión de he
 - Construcción del campo `vehiculo` = tipo + marca + línea + modelo
 - Split estratificado train / val / test
 
-### 2.2. Arquitectura del modelo RAG
+### 2.2. Indexación: campos del documento y vector de embeddings
+
+Cada aviso del conjunto **train** se convierte en un documento de Azure AI Search mediante `row_to_search_document()` (`Entrenamiento/src/documents.py`). El vector **`content_vector`** se genera en `index_train_corpus()` (`Entrenamiento/src/indexer.py`) llamando a `text-embedding-3-small` **únicamente sobre el campo `content`** — no hay embeddings separados por piezas, vehículo u otros campos.
+
+| Campo | Origen en el dataset | Qué contiene | ¿Entra al embedding? | Uso en el sistema |
+|-------|----------------------|--------------|:----------------------:|-------------------|
+| `id` | `numero_aviso` | Identificador del aviso | No | Clave primaria del índice |
+| `numero_aviso` | `numero_aviso` | Mismo ID como texto | No | Filtros, trazabilidad, respuesta API |
+| `content` | `build_case_text(..., include_dictamen=True)` | Texto multilínea unificado (véase abajo) | **Sí — único input del embedding** | Búsqueda híbrida (BM25 + vector) y contexto en el prompt del LLM |
+| `version_hechos` | `version_hechos` | Relato del siniestro | No (ya está dentro de `content`) | Búsqueda por palabras clave (parte BM25 de la híbrida) |
+| `piezas_texto` | agregación de piezas | Lista de piezas afectadas | No (ya está dentro de `content`) | Búsqueda por palabras clave (BM25) |
+| `vehiculo` | tipo + marca + línea + modelo | Descripción del vehículo | No (ya está dentro de `content`) | Filtro / faceta; BM25 |
+| `estado_aviso` | `estado_aviso` | `ENTREGADO` o `OBJETADO` | No (incluido como línea `DICTAMEN:` en `content`) | Filtro / faceta; dictamen histórico en casos recuperados |
+| `content_vector` | `embed(content)` | 1536 valores float | — (es la salida) | Similitud vectorial en la recuperación (`top-K`) |
+
+**Texto que compone `content` (indexación — train):**
+
+```text
+AVISO: {numero_aviso}
+VEHICULO: {vehiculo}
+VERSION DE HECHOS: {version_hechos}
+PIEZAS AFECTADAS: {piezas_texto}
+PIEZAS TOTALES: {piezas_totales}
+PIEZAS CAMBIO: {piezas_cambio}
+DICTAMEN: {estado_aviso}
+```
+
+En **inferencia**, el embedding de la consulta se genera con el **mismo formato pero sin la línea `DICTAMEN:`** (`build_case_text(..., include_dictamen=False)`), para no filtrar la etiqueta real al clasificar un aviso nuevo. Ese texto se usa a la vez como `search_text` (BM25) y como input del embedding (vector).
+
+**Ejemplo de documento indexado** (el vector se abrevia; en el índice son 1536 floats):
+
+```json
+{
+  "id": "281375",
+  "numero_aviso": "281375",
+  "content": "AVISO: 281375\nVEHICULO: AUTOMOVIL TOYOTA COROLLA 2020\nVERSION DE HECHOS: El asegurado reporta colisión trasera en semáforo...\nPIEZAS AFECTADAS: parachoques trasero; tapabarros trasero der\nPIEZAS TOTALES: 2\nPIEZAS CAMBIO: 2\nDICTAMEN: OBJETADO",
+  "version_hechos": "El asegurado reporta colisión trasera en semáforo...",
+  "piezas_texto": "parachoques trasero; tapabarros trasero der",
+  "vehiculo": "AUTOMOVIL TOYOTA COROLLA 2020",
+  "estado_aviso": "OBJETADO",
+  "content_vector": [-0.012, 0.034, "... 1534 valores más ..."]
+}
+```
+
+**Ejemplo de consulta en inferencia** (mismo aviso, sin dictamen — esto es lo que se embeddea y se busca):
+
+```json
+{
+  "numero_aviso": "281375",
+  "query_text": "AVISO: 281375\nVEHICULO: AUTOMOVIL TOYOTA COROLLA 2020\nVERSION DE HECHOS: El asegurado reporta colisión trasera en semáforo...\nPIEZAS AFECTADAS: parachoques trasero; tapabarros trasero der\nPIEZAS TOTALES: 2\nPIEZAS CAMBIO: 2"
+}
+```
+
+### 2.3. Arquitectura del modelo RAG
 
 La arquitectura sigue el patrón **RAG sobre Azure**: un orquestador (API Flask) coordina la recuperación de casos similares en **Azure AI Search** y la generación del dictamen en **Azure OpenAI**, alimentado por el corpus histórico indexado en el entrenamiento.
 
@@ -324,11 +379,11 @@ La **[estabilidad entre val y test](#43-comparación-val-vs-test)** refuerza la 
 
 La **[confianza del LLM](#45-confianza-del-llm)** muestra sobreconfianza: el modelo reporta valores altos (~0,93–0,95) tanto en aciertos como en errores, por lo que `confianza` no sustituye la revisión humana en casos dudosos.
 
-**Trabajo futuro propuesto**
+### 4.7. Trabajo futuro propuesto
 
 Aunque el recall de OBJETADO cumple el objetivo de negocio, los 5 falsos negativos y los 81 falsos positivos del conjunto val+test muestran margen de mejora. Se propone analizar de forma puntual los 5 FN — avisos objetados que el modelo clasificó como entregados — revisando en cada uno la versión de hechos, las piezas, las razones generadas y los casos similares recuperados, a fin de entender por qué no se aplicó la objeción y, si corresponde, ajustar el prompt o la recuperación en Azure AI Search. Del mismo modo, se recomienda revisar los 81 FP para identificar patrones repetidos: en este modelo suelen deberse a la estrategia conservadora del prompt, a la activación de reglas como tercero o inconsistencia relato–piezas, o a que al menos 1 caso similar objetado aparece entre los recuperados. Esos casos están registrados en `data/val_predictions.csv` y `data/test_predictions.csv`.
 
-Las reglas de negocio — terceros involucrados, inconsistencia, duda razonable y prioridad de recall en OBJETADO — ya están definidas en el system prompt del clasificador (véase [sección 2.2](#22-arquitectura-del-modelo-rag) e implementación en `Entrenamiento/src/rag_classifier.py`) [4]. No obstante, el campo de confianza que devuelve el LLM no distingue con claridad entre aciertos y errores, tal como se muestra en la [sección 4.5](#45-confianza-del-llm). Se propone, en una fase posterior, complementar ese indicador con otras señales: las probabilidades internas del propio modelo (logprobs) [5]; las puntuaciones de recuperación y la proporción de dictámenes entre los casos similares, coherentes con el uso de contexto recuperado en RAG [2][4]; y evaluaciones por lote sobre val y test [6], útiles para auditar el servicio fuera de la inferencia en tiempo real.
+Las reglas de negocio como: terceros involucrados, inconsistencia, duda razonable y prioridad de recall en OBJETADO ya están definidas en el system prompt del clasificador (véase [sección 2.3](#23-arquitectura-del-modelo-rag) e implementación en `Entrenamiento/src/rag_classifier.py`) [4]. No obstante, el campo de confianza que devuelve el LLM no distingue con claridad entre aciertos y errores, tal como se muestra en la [sección 4.5](#45-confianza-del-llm). Se propone, en una fase posterior, complementar ese indicador con otras señales: las probabilidades internas del propio modelo (logprobs) [5]; las puntuaciones de recuperación y la proporción de dictámenes entre los casos similares, coherentes con el uso de contexto recuperado en RAG [2][4]; y evaluaciones por lote sobre val y test [6], útiles para auditar el servicio fuera de la inferencia en tiempo real.
 
 Por último, se propone evaluar otros despliegues de lenguaje y de embeddings que reduzcan costo en Azure sin degradar el recall; automatizar la re-indexación del corpus train cuando se incorporen avisos nuevos (`train_rag.py`); completar la operación en producción con Managed Identity en Search y Application Insights; y monitorear de forma continua recall, tasa de FP y deriva del servicio para decidir cuándo re-indexar o retocar el prompt.
 
