@@ -33,7 +33,7 @@ En la Web App → **Configuration** → **General settings**:
 
 | Campo | Valor |
 |-------|--------|
-| **Startup Command** | `bash Inferencia/startup.sh` |
+| **Startup Command** | `bash startup.sh` |
 | **Always On** | On (recomendado) |
 
 Guarda y reinicia si pide.

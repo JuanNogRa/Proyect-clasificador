@@ -7,6 +7,10 @@ on:
       - "Inferencia/**"
       - "Entrenamiento/src/**"
       - "requirements.txt"
+      - "wsgi.py"
+      - "startup.sh"
+      - "runtime.txt"
+      - ".gitattributes"
       - ".github/workflows/deploy-inferencia.yml"
   workflow_dispatch:
 
@@ -16,6 +20,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Verify deploy entrypoint
+        run: |
+          test -f wsgi.py
+          test -f startup.sh
+          test -d Entrenamiento/src
+          test -f Inferencia/api/app.py
 
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
