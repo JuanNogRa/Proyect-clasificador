@@ -8,7 +8,6 @@ Pipeline de indexación y evaluación del clasificador RAG con Azure OpenAI + Az
 Entrenamiento/
 ├── data/                  # Dataset y predicciones exportadas
 ├── pt.ipynb               # Prueba técnica RAG + evaluación
-├── pt - ml.ipynb          # Exploración ML (baseline)
 ├── scripts/
 │   └── train_rag.py       # Indexa train en Azure AI Search
 ├── src/                   # Módulos del pipeline
