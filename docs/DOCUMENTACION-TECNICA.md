@@ -328,7 +328,7 @@ La **[confianza del LLM](#45-confianza-del-llm)** muestra sobreconfianza: el mod
 
 Aunque el recall de OBJETADO cumple el objetivo de negocio, los 5 falsos negativos y los 81 falsos positivos del conjunto val+test muestran margen de mejora. Se propone analizar de forma puntual los 5 FN — avisos objetados que el modelo clasificó como entregados — revisando en cada uno la versión de hechos, las piezas, las razones generadas y los casos similares recuperados, a fin de entender por qué no se aplicó la objeción y, si corresponde, ajustar el prompt o la recuperación en Azure AI Search. Del mismo modo, se recomienda revisar los 81 FP para identificar patrones repetidos: en este modelo suelen deberse a la estrategia conservadora del prompt, a la activación de reglas como tercero o inconsistencia relato–piezas, o a que al menos 1 caso similar objetado aparece entre los recuperados. Esos casos están registrados en `data/val_predictions.csv` y `data/test_predictions.csv`.
 
-Las reglas de negocio: terceras personas involucradas, inconsistencia, duda razonable y prioridad de recall en OBJETADO ya están definidas en el system prompt. No obstante, el campo de confianza que devuelve el LLM no distingue con claridad entre aciertos y errores, tal como se muestra en la [sección 4.5](#45-confianza-del-llm). Se propone, en una fase posterior, complementar ese indicador con otras señales: las probabilidades internas del propio modelo (logprobs), las puntuaciones de recuperación y la proporción de dictámenes entre los casos similares, obtenibles sin modificar el LLM; y evaluaciones por lote sobre val y test, útiles para auditar el servicio fuera de la inferencia en tiempo real.
+Las reglas de negocio — terceros involucrados, inconsistencia, duda razonable y prioridad de recall en OBJETADO — ya están definidas en el system prompt del clasificador (véase [sección 2.2](#22-arquitectura-del-modelo-rag) e implementación en `Entrenamiento/src/rag_classifier.py`) [4]. No obstante, el campo de confianza que devuelve el LLM no distingue con claridad entre aciertos y errores, tal como se muestra en la [sección 4.5](#45-confianza-del-llm). Se propone, en una fase posterior, complementar ese indicador con otras señales: las probabilidades internas del propio modelo (logprobs) [5]; las puntuaciones de recuperación y la proporción de dictámenes entre los casos similares, coherentes con el uso de contexto recuperado en RAG [2][4]; y evaluaciones por lote sobre val y test [6], útiles para auditar el servicio fuera de la inferencia en tiempo real.
 
 Por último, se propone evaluar otros despliegues de lenguaje y de embeddings que reduzcan costo en Azure sin degradar el recall; automatizar la re-indexación del corpus train cuando se incorporen avisos nuevos (`train_rag.py`); completar la operación en producción con Managed Identity en Search y Application Insights; y monitorear de forma continua recall, tasa de FP y deriva del servicio para decidir cuándo re-indexar o retocar el prompt.
 
@@ -425,15 +425,17 @@ curl -X POST http://localhost:8000/v1/predict -H "Content-Type: application/json
 
 ## Referencias
 
-[1] L. Lewis et al., "Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks," *NeurIPS*, 2020.
+[1] Microsoft, "Azure OpenAI Service documentation," [Online]. Available: https://learn.microsoft.com/azure/ai-services/openai/
 
-[2] Microsoft, "Azure OpenAI Service documentation," [Online]. Available: https://learn.microsoft.com/azure/ai-services/openai/
+[2] Microsoft, "Vector search in Azure AI Search," [Online]. Available: https://learn.microsoft.com/azure/search/vector-search-overview
 
-[3] Microsoft, "Vector search in Azure AI Search," [Online]. Available: https://learn.microsoft.com/azure/search/vector-search-overview
+[3] Microsoft, "Diagrama de arquitectura de patrones RAG con búsqueda de Azure AI," *Administración de requisitos*, [Online]. Available: https://learn.microsoft.com/es-es/industry/mobility/architecture/manage-requirements
 
-[4] Microsoft, "Diagrama de arquitectura de patrones RAG con búsqueda de Azure AI," *Administración de requisitos*, [Online]. Available: https://learn.microsoft.com/es-es/industry/mobility/architecture/manage-requirements
+[4] Microsoft, "Diseño y desarrollo de una solución RAG en Azure," *Azure Architecture Center*, [Online]. Available: https://learn.microsoft.com/es-es/azure/architecture/ai-ml/guide/rag/rag-solution-design-and-evaluation-guide
 
-[5] Microsoft, "Diseño y desarrollo de una solución RAG en Azure," *Azure Architecture Center*, [Online]. Available: https://learn.microsoft.com/es-es/azure/architecture/ai-ml/guide/rag/rag-solution-design-and-evaluation-guide
+[5] OpenAI, "Chat Completions — logprobs," *API Reference*, [Online]. Available: https://platform.openai.com/docs/api-reference/chat/create
+
+[6] Microsoft, "Retrieval-Augmented Generation (RAG) evaluators," *Microsoft Foundry*, [Online]. Available: https://learn.microsoft.com/en-us/azure/ai-foundry/concepts/evaluation-evaluators/rag-evaluators
 
 ---
 
