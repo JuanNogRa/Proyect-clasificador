@@ -5,7 +5,7 @@
 **Julio de 2026**
 
 **Repositorio:** [JuanNogRa/Proyect-clasificador](https://github.com/JuanNogRa/Proyect-clasificador)  
-**API en producción:** `https://rag-siniestros-api-fpgsfaepfsd6abc7.westus3-01.azurewebsites.net`
+**API en producción de inferencia:** `https://rag-siniestros-api-fpgsfaepfsd6abc7.westus3-01.azurewebsites.net`
 
 ---
 
@@ -493,5 +493,3 @@ curl -X POST http://localhost:8000/v1/predict -H "Content-Type: application/json
 [6] Microsoft, "Retrieval-Augmented Generation (RAG) evaluators," *Microsoft Foundry*, [Online]. Available: https://learn.microsoft.com/en-us/azure/ai-foundry/concepts/evaluation-evaluators/rag-evaluators
 
 ---
-
-*Documento técnico del proyecto RAG Siniestros — Subocol IA. Estructura basada en `Documentación_pruebaTecnica.pdf`.*
